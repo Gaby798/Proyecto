@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Armado del tablero paso a paso</title>
+<style>
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0}
+body{background:#161616;color:#ddd;font-family:system-ui,sans-serif;padding:10px}
+#c{width:100%;height:56vh;min-height:340px;border-radius:12px;background:#202020;overflow:hidden}
+canvas{display:block}
+#info{background:#222;border:1px solid #333;border-radius:10px;padding:10px 12px;margin:8px 0}
+#info b{font-size:16px;color:#fff}#info div{font-size:13px;color:#bbb;margin-top:4px}
+.r{display:flex;align-items:center;gap:10px;margin:6px 0}.r label{width:60px}.r input{flex:1}
+button{background:#2a2a2a;color:#ddd;border:1px solid #444;border-radius:8px;padding:8px 12px;margin:0 6px 6px 0;font-size:14px}
+button.p{background:#b0683a;color:#fff;border-color:#b0683a}
+#dots{display:flex;gap:6px;margin:6px 0}#dots i{flex:1;height:6px;border-radius:3px;background:#333}#dots i.on{background:#b0683a}
+p{font-size:12px;color:#999;margin:6px 0}
+</style></head><body>
+<div id="dots"></div>
+<div id="c"></div>
+<div id="info"><b id="t"></b><div id="d"></div></div>
+<button id="pv">◀ Anterior</button><button id="nx" class="p">Siguiente ▶</button><button id="pl">Reproducir</button><button id="rs2">Reiniciar</button><br>
+<button id="a">Giro automático</button><button id="f">Vista frontal</button><button id="b">Vista posterior</button>
+<div class="r"><label>Giro</label><input id="az" type="range" min="-180" max="180" value="20"></div>
+<div class="r"><label>Altura</label><input id="el" type="range" min="-10" max="70" value="12"></div>
+<p>Medidas aproximadas, hechas a partir de croquis.</p>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const W=document.getElementById('c'),S=new THREE.Scene(),cam=new THREE.PerspectiveCamera(35,1,1,600);
+const R=new THREE.WebGLRenderer({antialias:true,alpha:true});R.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+R.outputEncoding=THREE.sRGBEncoding;R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.15;R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;W.appendChild(R.domElement);
+S.add(new THREE.HemisphereLight(0xffffff,0x3a3d45,.9));const dl=new THREE.DirectionalLight(0xffffff,.85);dl.position.set(30,60,80);dl.castShadow=true;dl.shadow.mapSize.set(2048,2048);dl.shadow.bias=-.0004;Object.assign(dl.shadow.camera,{left:-90,right:90,top:90,bottom:-90,near:1,far:400});S.add(dl);
+const L=new THREE.DirectionalLight(0xffffff,.35);L.position.set(-30,40,-80);S.add(L);
+const M=c=>new THREE.MeshStandardMaterial({color:c,roughness:c==0xb0683a?.38:.55,metalness:c==0xb0683a?.45:.12});
+const EM=new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:.35});
+let G;const groups=[];function ng(){G=new THREE.Group();S.add(G);groups.push(G)}
+function bx(w,h,d,x,y,z,c){const g=new THREE.BoxGeometry(w,h,d),m=new THREE.Mesh(g,M(c));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;
+ if(w*h*d<60000)m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),EM));G.add(m);return m}
+function tb(p,c,r=.3){const cv=new THREE.CatmullRomCurve3(p.map(a=>new THREE.Vector3(...a)),false,'catmullrom',.05);
+ const m=new THREE.Mesh(new THREE.TubeGeometry(cv,120,r,16),M(c));m.castShadow=true;G.add(m)}
+function lb(t,x,y,z,s=5){const k=document.createElement('canvas');k.width=768;k.height=384;const g=k.getContext('2d');
+ g.font='bold 240px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.lineJoin='round';g.lineWidth=28;g.strokeStyle='rgba(0,0,0,.85)';g.strokeText(t,384,200);g.fillStyle='#fff';g.fillText(t,384,200);
+ const tx=new THREE.CanvasTexture(k);tx.encoding=THREE.sRGBEncoding;
+ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tx,depthTest:false}));
+ sp.scale.set(s,s/2,1);sp.position.set(x,y,z);G.add(sp)}
+const cu=0xb0683a,rd=0x9c2a22,ys=[0,9,18];
+const STEPS=[
+['1. Placa de montaje','Se fija la placa de respaldo (60 × 56) donde irá todo el conjunto.'],
+['2. Barras horizontales','Tres barras de cobre horizontales a 0, 9 y 18 cm de altura, con su bloque terminal rojo en el extremo derecho.'],
+['3. Barras verticales R, S, T','Cada fase sube por su barra vertical (R a la izquierda, S al centro, T a la derecha) con su terminal y rótulo.'],
+['4. Seccionadores','Dos soportes verticales (1 y 2) con tres módulos azules cada uno, uno por fase.'],
+['5. Sensores térmicos','Seis grupos de sensor (cilindro, tuerca, cuerpo rojo y base) entre cada módulo y la barra: 3 por seccionador.'],
+['6. Caja de relés','Se monta la caja arriba a la derecha con los relés R1 y R2 y sus lámparas LL1 y LL2.'],
+['7. Cableado de sensores','Cada sensor lleva 2 conductores (rojo y amarillo). Los 3 sensores de cada seccionador se unen en paralelo y suben a su relé.'],
+['8. Cables hacia AP','Dos conductores delgados salen del lado derecho de las barras y bajan hacia AP.'],
+['9. Alimentación L y N (220 V)','L (fase) y N (neutro) entran por el lado derecho de la caja para alimentar el mando.']];
+// 1
+ng();const plate=bx(60,56,1,0,18,-8.5,0x454a52);
+ng();ys.forEach(y=>{bx(52,4,1.2,0,y,0,cu);bx(2.5,4,1.4,27,y,0,rd)});
+ng();[[-20,18,38,'R'],[0,9,34,'S'],[20,0,30,'T']].forEach(([x,y,t,n])=>{
+ bx(4,4,4,x,y,-2,cu);bx(4,t-y,1.2,x,(t+y)/2,-4,cu);bx(2,2,1.4,x,t-2,-3.3,0x111111);lb(n,x,t+3,-4)});
+ng();[-10,10].forEach(sx=>{bx(7,34,4,sx,10,3,0xa0a3a8);
+ ys.forEach(y=>{bx(8.4,4.5,4.4,sx,y,3,0x1d2750);bx(1.6,1.6,.3,sx,y+4.5,5.1,0xd4b02a)})});
+ng();[-10,10].forEach(sx=>ys.forEach(y=>{
+ const b=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,3.6,32),M(0x888888));b.rotation.x=Math.PI/2;b.position.set(sx,y,-.3);G.add(b);
+ bx(2.2,2.2,.8,sx,y,-2.4,0x777777);bx(3,3,2,sx,y,-3.6,rd);bx(1.6,1.6,.5,sx,y,-4.8,0x333333)}));
+ng();bx(15,7,2.5,19,41.5,-6.5,0x5a5e66);
+[15.5,22.5].forEach(x=>bx(2.4,2.4,.4,x,43,-5.1,0xc0392b));
+lb('LL1',15.5,44.2,-3);lb('R1',15.5,40,-3);lb('LL2',22.5,44.2,-3);lb('R2',22.5,40,-3);
+ng();[[-10,[14,15.5],-5.2],[10,[20,21.5],-3.6]].forEach(([sx,tx,zt])=>{
+ [[-1,0xd9362b,tx[0]],[1,0xe3c21d,tx[1]]].forEach(([d,c,t])=>{
+  const cx=sx+d*3.4;
+  ys.forEach(y=>{tb([[sx+d*1.5,y,-3.8],[cx,y,-3.8]],c,.28);
+   const j=new THREE.Mesh(new THREE.SphereGeometry(.5,16,12),M(c));j.position.set(cx,y,-3.8);G.add(j)});
+  tb([[cx,0,-3.8],[cx,18,-3.8],[cx,30,-3.8],[cx,33,zt],[t,36,zt-.3],[t,38,-6]],c,.28)})});
+ng();[[18,37],[9,34.5]].forEach(([y,x0])=>tb([[28.2,y,0],[x0-2,y,0],[x0,y-2,.5],[x0,-12,.5],[x0,-26,.5]],0x8a8f98,.4));
+lb('AP',35.5,-29,.5,7);
+ng();[[0x8b5a2b,31.5],[0x4aa3ff,33.5]].forEach(([c,x])=>tb([[26.5,43.6,-6.5],[29,43.6,-6.5],[x,41,-6],[x,34,-6],[x,28,-6]],c,.4));
+lb('L',31.5,25.5,-6,4);lb('N',33.5,25.5,-6,4);lb('220 V',32.5,22.5,-6,7);
+
+const N=STEPS.length,prog=groups.map(()=>0);let step=0,az=20,au=false,play=0;
+const A=document.getElementById('az'),E=document.getElementById('el'),dots=document.getElementById('dots');
+STEPS.forEach(()=>dots.appendChild(document.createElement('i')));
+function ui(){document.getElementById('t').textContent=STEPS[step][0];document.getElementById('d').textContent=STEPS[step][1];
+ [...dots.children].forEach((d,i)=>d.className=i<=step?'on':'');
+ document.getElementById('pv').disabled=step==0;document.getElementById('nx').disabled=step==N-1;
+ // las vistas ayudan: los pasos de cableado se ven mejor desde atrás
+ if(step>=6&&Math.cos(az*Math.PI/180)>0){az=180;A.value=180}}
+function go(n){step=Math.max(0,Math.min(N-1,n));ui()}
+const ctr=new THREE.Vector3(6,14,0),ez=t=>1-Math.pow(1-t,3);
+function draw(){const a=az*Math.PI/180,e=E.value*Math.PI/180,r=125;
+ groups.forEach((g,i)=>{if(i<=step)prog[i]=Math.min(1,prog[i]+.04);else prog[i]=0;
+  g.visible=prog[i]>0;g.position.y=(1-ez(prog[i]))*30});
+ cam.position.set(ctr.x+r*Math.sin(a)*Math.cos(e),ctr.y+r*Math.sin(e),ctr.z+r*Math.cos(a)*Math.cos(e));cam.lookAt(ctr);
+ plate.visible=Math.cos(a)>.15;R.render(S,cam)}
+function rs(){const w=W.clientWidth,h=W.clientHeight;R.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix()}
+A.oninput=()=>{az=+A.value};
+document.getElementById('nx').onclick=()=>{play=0;go(step+1)};
+document.getElementById('pv').onclick=()=>{play=0;go(step-1)};
+document.getElementById('rs2').onclick=()=>{play=0;go(0)};
+document.getElementById('pl').onclick=()=>{go(0);play=1;tm=0};
+document.getElementById('a').onclick=()=>au=!au;
+document.getElementById('f').onclick=()=>{au=false;az=0;A.value=0};
+document.getElementById('b').onclick=()=>{au=false;az=180;A.value=180};
+addEventListener('resize',rs);rs();ui();let tm=0;
+(function t(){if(au){az=((az+.4+180)%360)-180;A.value=az}
+ if(play&&++tm>110){tm=0;if(step<N-1)go(step+1);else play=0}
+ draw();requestAnimationFrame(t)})();
+</script></body></html>
